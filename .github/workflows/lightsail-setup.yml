@@ -1,0 +1,90 @@
+name: Lightsail Setup (DB + Redis)
+
+# Run manually: Actions → Lightsail Setup → Run workflow
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to perform"
+        required: true
+        default: status
+        type: choice
+        options:
+          - status
+          - setup
+          - restart
+
+# ── Required GitHub Secrets ──────────────────────────────────────────────
+#   LIGHTSAIL_HOST        — Public IPv4 of AWS Lightsail instance
+#   LIGHTSAIL_SSH_KEY     — Private SSH key (ed25519), no passphrase
+#   POSTGRES_PASSWORD     — Production Postgres password
+
+jobs:
+  lightsail:
+    name: Lightsail ${{ github.event.inputs.action }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        env:
+          SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Check status
+        if: github.event.inputs.action == 'status'
+        env:
+          REMOTE_HOST: ${{ secrets.LIGHTSAIL_HOST }}
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=15 \
+            "ubuntu@${REMOTE_HOST}" \
+            "sudo docker ps; df -h /; free -h"
+
+      - name: Setup DB + Redis
+        if: github.event.inputs.action == 'setup'
+        env:
+          REMOTE_HOST: ${{ secrets.LIGHTSAIL_HOST }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=15 \
+            "ubuntu@${REMOTE_HOST}" << 'ENDSSH'
+          set -e
+
+          # Install Docker if needed
+          if ! sudo docker version &>/dev/null; then
+            curl -fsSL https://get.docker.com | sudo sh
+            sudo systemctl enable docker && sudo systemctl start docker
+            sudo usermod -aG docker ubuntu
+          fi
+
+          # Create app directory
+          APP_DIR=/opt/app
+          sudo mkdir -p "$APP_DIR"
+          sudo chown ubuntu:ubuntu "$APP_DIR"
+
+          # Write .env
+          cat > "$APP_DIR/.env" << EOF
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          EOF
+          chmod 600 "$APP_DIR/.env"
+
+          echo "Setup complete. Upload docker-compose.prod.yml and run:"
+          echo "  cd $APP_DIR && docker compose -f docker-compose.prod.yml up -d"
+          ENDSSH
+
+      - name: Restart services
+        if: github.event.inputs.action == 'restart'
+        env:
+          REMOTE_HOST: ${{ secrets.LIGHTSAIL_HOST }}
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=no -o BatchMode=yes -o ConnectTimeout=15 \
+            "ubuntu@${REMOTE_HOST}" \
+            "cd /opt/app && sudo docker compose -f docker-compose.prod.yml restart"

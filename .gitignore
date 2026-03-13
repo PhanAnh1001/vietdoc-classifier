@@ -1,0 +1,42 @@
+# dependencies
+node_modules/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# next.js
+.next/
+out/
+
+# build
+build/
+dist/
+
+# misc
+.DS_Store
+*.pem
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# vercel
+.vercel
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# Test artifacts
+backend/test.db
+backend/test.db-journal
+backend/*.db
+backend/*.db-journal
