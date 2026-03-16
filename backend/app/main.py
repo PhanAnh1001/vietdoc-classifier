@@ -1,15 +1,16 @@
 """
-FastAPI entry point.
+FastAPI entry point — VietDoc Classifier.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routers import auth, items
+from app.routers import auth
+from app.routers import classify, batch, evaluate
 
 app = FastAPI(
-    title="My App API",
-    version="0.1.0",
-    description="Backend API template — Next.js + FastAPI + PostgreSQL",
+    title="VietDoc Classifier API",
+    version="1.0.0",
+    description="Hệ thống phân loại chứng từ kế toán, ngân hàng tiếng Việt bằng AI",
 )
 
 app.add_middleware(
@@ -21,10 +22,11 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
-app.include_router(items.router, prefix="/api/v1/items", tags=["items"])
+app.include_router(classify.router, prefix="/api/v1/classify", tags=["classify"])
+app.include_router(batch.router, prefix="/api/v1/batch", tags=["batch"])
+app.include_router(evaluate.router, prefix="/api/v1/evaluate", tags=["evaluate"])
 
 
 @app.get("/health")
 async def health():
-    """Health check endpoint."""
-    return {"status": "ok", "service": "my-app-backend"}
+    return {"status": "ok", "service": "vietdoc-classifier"}

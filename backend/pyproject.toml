@@ -1,6 +1,6 @@
 [project]
-name = "my-app-backend"
-version = "0.1.0"
+name = "vietdoc-classifier"
+version = "1.0.0"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115.0",
@@ -15,6 +15,9 @@ dependencies = [
     "python-jose[cryptography]>=3.3.0",
     "passlib[bcrypt]>=1.7.4",
     "redis>=5.0.0",
+    "groq>=0.8.0",
+    "pypdf>=4.0.0",
+    "pillow>=10.0.0",
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "aiosqlite>=0.20.0",
