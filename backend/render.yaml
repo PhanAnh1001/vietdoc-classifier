@@ -1,9 +1,9 @@
-# Render Blueprint — Backend Web Service
+# Render Blueprint — VietDoc Classifier Backend
 # https://render.com/docs/blueprint-spec
 
 services:
   - type: web
-    name: my-app-backend
+    name: vietdoc-classifier
     runtime: docker
     dockerfilePath: ./Dockerfile
     envVars:
@@ -13,5 +13,11 @@ services:
         generateValue: true
       - key: REDIS_URL
         sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_VISION_MODEL
+        value: llama-3.2-11b-vision-preview
+      - key: GROQ_LLM_MODEL
+        value: llama-3.3-70b-versatile
     healthCheckPath: /health
     autoDeploy: true
