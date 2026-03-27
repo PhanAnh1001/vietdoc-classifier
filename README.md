@@ -1,21 +1,21 @@
 # VietDoc Classifier
 
-> Hệ thống phân loại tự động chứng từ kế toán, ngân hàng tiếng Việt bằng AI — accuracy ≥ 90% trên 13 loại tài liệu.
+> Automated classification of Vietnamese accounting and banking documents using AI — accuracy ≥ 90% across 13 document types.
+
+**[Tiếng Việt](README.vi.md)**
 
 Vietnamese enterprises process hundreds of financial documents daily. Manual classification is slow and error-prone at scale. This system automates the workflow using a two-stage LLM pipeline: **Vision OCR → zero-shot classification + structured metadata extraction**.
 
 ---
 
-## Demo
+## How It Works
 
-| Bước | Mô tả |
-|------|--------|
-| 1 | Upload file PDF/JPG/PNG (hóa đơn, phiếu chi, sao kê, ...) |
-| 2 | OCR: Groq Llama Vision trích xuất text; PDF dùng pypdf |
-| 3 | Classify: Groq Llama 3.3 70B trả về loại + confidence + metadata |
-| 4 | Kết quả hiển thị ngay, metadata trích xuất tự động (số HĐ, ngày, MST, số tiền...) |
+1. Upload a PDF, JPG, or PNG (invoice, payment voucher, bank statement, ...)
+2. **OCR**: Groq Llama Vision extracts text from images; pypdf handles text-based PDFs
+3. **Classify**: Groq Llama 3.3 70B returns document type + confidence score + extracted metadata
+4. Results display immediately — invoice number, date, tax ID, amount pulled automatically
 
-**Batch mode**: upload 50 file cùng lúc, xử lý bất đồng bộ, polling trạng thái real-time.
+**Batch mode**: upload up to 50 files at once, processed asynchronously with real-time status polling.
 
 ---
 
@@ -43,12 +43,12 @@ File (PDF / JPG / PNG)
 
 ### Prompt Engineering
 
-**Vấn đề**: LLM cần trả về JSON có cấu trúc khác nhau tuỳ loại tài liệu (hóa đơn → số hóa đơn, MST; bảng lương → period, tổng lương...).
+**Challenge**: the LLM must return a different JSON schema depending on document type — invoices need invoice number, tax ID, VAT breakdown; payroll sheets need period, headcount, totals; etc.
 
-**Giải pháp**: một prompt duy nhất với schema hướng dẫn per-type, kết hợp `temperature=0.1` để đầu ra deterministic; robust JSON parser xử lý markdown fences và regex fallback.
+**Solution**: a single prompt with per-type schema hints, `temperature=0.1` for near-deterministic output, and a robust JSON parser that strips markdown fences and falls back to regex extraction.
 
 ```python
-# classifier_service.py — core prompt strategy
+# classifier_service.py
 completion = client.chat.completions.create(
     model="llama-3.3-70b-versatile",
     messages=[{"role": "user", "content": prompt}],
@@ -59,78 +59,79 @@ completion = client.chat.completions.create(
 
 ### 13 Supported Document Types
 
-| Key | Tên tiếng Việt |
-|-----|----------------|
-| `hoa_don_vat_dau_vao` | Hóa đơn VAT đầu vào |
-| `hoa_don_vat_dau_ra` | Hóa đơn VAT đầu ra |
-| `phieu_chi` | Phiếu chi |
-| `phieu_thu` | Phiếu thu |
-| `sao_ke_ngan_hang` | Sao kê ngân hàng |
-| `giay_uy_quyen` | Giấy ủy quyền |
-| `thong_bao_cong_no` | Thông báo công nợ |
-| `thong_bao_ghi_co` | Thông báo ghi có |
-| `bien_lai` | Biên lai |
-| `hop_dong` | Hợp đồng |
-| `phieu_ke_toan` | Phiếu kế toán |
-| `bang_luong` | Bảng lương |
-| `khac` | Khác |
+| Key | Vietnamese Name | English |
+|-----|-----------------|---------|
+| `hoa_don_vat_dau_vao` | Hóa đơn VAT đầu vào | Input VAT invoice |
+| `hoa_don_vat_dau_ra` | Hóa đơn VAT đầu ra | Output VAT invoice |
+| `phieu_chi` | Phiếu chi | Payment voucher |
+| `phieu_thu` | Phiếu thu | Receipt voucher |
+| `sao_ke_ngan_hang` | Sao kê ngân hàng | Bank statement |
+| `giay_uy_quyen` | Giấy ủy quyền | Authorization letter |
+| `thong_bao_cong_no` | Thông báo công nợ | Debt notice |
+| `thong_bao_ghi_co` | Thông báo ghi có | Credit advice |
+| `bien_lai` | Biên lai | Receipt |
+| `hop_dong` | Hợp đồng | Contract |
+| `phieu_ke_toan` | Phiếu kế toán | Journal voucher |
+| `bang_luong` | Bảng lương | Payroll sheet |
+| `khac` | Khác | Other |
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology | Lý do chọn |
-|-------|-----------|-------------|
-| LLM | Groq Llama 3.3 70B | Fastest inference, free tier đủ dùng |
-| Vision OCR | Groq Llama 3.2 Vision 11B | Multimodal, xử lý scan/ảnh chụp |
-| PDF OCR | pypdf | Deterministic, không cần API cho PDF text |
-| Backend | FastAPI (async) | Async I/O cho file upload + LLM calls |
-| Frontend | Next.js 15 + TypeScript | App Router, SSR |
-| Database | PostgreSQL + SQLAlchemy async | Lưu lịch sử + ground truth cho evaluation |
-| Queue | FastAPI BackgroundTasks | Đơn giản, đủ cho batch ≤ 50 files |
-| Deploy | Vercel + Render + AWS Lightsail | $0 → $3.50/month |
+| Layer | Technology | Why |
+|-------|-----------|-----|
+| LLM | Groq Llama 3.3 70B | Fastest inference on market, generous free tier |
+| Vision OCR | Groq Llama 3.2 Vision 11B | Multimodal — handles scans and photos |
+| PDF OCR | pypdf | Deterministic text extraction, no API call needed |
+| Backend | FastAPI (async) | Non-blocking I/O for concurrent file uploads + LLM calls |
+| Frontend | Next.js 15 + TypeScript | App Router, strong typing end-to-end |
+| Database | PostgreSQL + SQLAlchemy async | Stores history + ground-truth labels for evaluation |
+| Queue | FastAPI BackgroundTasks | Zero infra overhead for batch ≤ 50 files |
+| Deploy | Vercel + Render + AWS Lightsail | $0 – $3.50/month total |
 
 ---
 
 ## System Architecture
 
 ```
-┌─────────────┐     REST/multipart     ┌─────────────┐     async     ┌──────────────────┐
-│   Vercel    │ ──────────────────────▶│   Render    │ ────────────▶│  AWS Lightsail   │
-│  Next.js 15 │                        │   FastAPI   │              │  PostgreSQL + Redis│
-└─────────────┘                        └──────┬──────┘              └──────────────────┘
-                                              │ HTTP
-                                              ▼
-                                       ┌─────────────┐
-                                       │  Groq Cloud  │
-                                       │  Llama Vision│
-                                       │  Llama 3.3  │
-                                       └─────────────┘
+┌─────────────┐    REST/multipart    ┌─────────────┐    async    ┌──────────────────────┐
+│   Vercel    │ ───────────────────▶ │   Render    │ ──────────▶ │    AWS Lightsail     │
+│  Next.js 15 │                      │   FastAPI   │             │  PostgreSQL + Redis  │
+└─────────────┘                      └──────┬──────┘             └──────────────────────┘
+                                            │ HTTP
+                                            ▼
+                                     ┌─────────────┐
+                                     │  Groq Cloud │
+                                     │ Llama Vision│
+                                     │  Llama 3.3  │
+                                     └─────────────┘
 ```
 
 ---
 
 ## Quick Start
 
-**Yêu cầu**: Docker, Docker Compose, [Groq API key](https://console.groq.com) (free)
+**Requirements**: Docker, Docker Compose, [Groq API key](https://console.groq.com) (free)
 
 ```bash
 git clone https://github.com/PhanAnh1001/vietdoc-classifier
 cd vietdoc-classifier
 
-# Setup env
+# Configure environment
 cp .env.example .env
-# Điền GROQ_API_KEY vào .env
+# Fill in GROQ_API_KEY in .env
 
-# Start tất cả services (PostgreSQL + Redis + Backend + Frontend)
+# Start all services (PostgreSQL + Redis + Backend + Frontend)
 docker compose up -d
 
-# Chạy DB migration
+# Run DB migrations
+docker compose exec backend psql $DATABASE_URL -f migrations/init.sql
 docker compose exec backend psql $DATABASE_URL -f migrations/v2_documents.sql
 ```
 
 - Frontend: http://localhost:3000
-- API docs (Swagger): http://localhost:8000/docs
+- API docs (Swagger UI): http://localhost:8000/docs
 
 ---
 
@@ -139,12 +140,12 @@ docker compose exec backend psql $DATABASE_URL -f migrations/v2_documents.sql
 ```
 POST /api/v1/classify          Upload 1 file → doc_type + confidence + metadata
 POST /api/v1/batch             Upload ≤ 50 files → job_id (async)
-GET  /api/v1/batch/{job_id}    Poll batch status + kết quả từng file
-GET  /api/v1/evaluate          Accuracy + per-class F1 từ labeled documents
+GET  /api/v1/batch/{job_id}    Poll batch status + per-file results
+GET  /api/v1/evaluate          Accuracy + per-class F1 from labeled documents
 GET  /health
 ```
 
-Chi tiết: [`docs/technical/api-spec.md`](docs/technical/api-spec.md)
+Full spec: [`docs/technical/api-spec.md`](docs/technical/api-spec.md)
 
 ---
 
@@ -154,9 +155,9 @@ Chi tiết: [`docs/technical/api-spec.md`](docs/technical/api-spec.md)
 ```bash
 cd backend
 uv sync
-uv run uvicorn app.main:app --reload   # :8000
+uv run uvicorn app.main:app --reload   # http://localhost:8000
 
-# Tests (16 tests, SQLite in-memory, không cần Groq key)
+# Run tests (19 tests, SQLite in-memory, no Groq key required)
 uv run pytest tests/ -v
 ```
 
@@ -164,9 +165,9 @@ uv run pytest tests/ -v
 ```bash
 cd app
 npm install
-npm run dev        # :3000
-npm test           # Vitest
-npm run test:e2e   # Playwright
+npm run dev        # http://localhost:3000
+npm test           # Vitest unit tests
+npm run test:e2e   # Playwright E2E tests
 ```
 
 ---
@@ -174,60 +175,60 @@ npm run test:e2e   # Playwright
 ## Project Structure
 
 ```
-├── app/                          # Next.js 15 frontend
+├── app/                              # Next.js 15 frontend
 │   └── src/
 │       ├── app/(dashboard)/
-│       │   ├── classify/         # Single file upload + result
-│       │   ├── batch/            # Batch upload + polling
-│       │   └── evaluate/         # Accuracy / F1 dashboard
-│       ├── components/classify/  # ClassifyResult card
-│       └── lib/api.ts            # Typed API client
+│       │   ├── classify/             # Single file upload + result card
+│       │   ├── batch/                # Batch upload + real-time polling
+│       │   └── evaluate/             # Accuracy / F1 metrics dashboard
+│       ├── components/classify/      # ClassifyResult component
+│       └── lib/api.ts                # Fully-typed API client
 │
 ├── backend/
 │   ├── app/
 │   │   ├── services/
-│   │   │   ├── ocr_service.py        # PDF / Vision OCR
-│   │   │   ├── classifier_service.py # Groq LLM + prompt
+│   │   │   ├── ocr_service.py        # PDF pypdf + Groq Vision OCR
+│   │   │   ├── classifier_service.py # Groq LLM prompt + JSON parsing
 │   │   │   └── batch_service.py      # Async batch processor
 │   │   └── routers/
-│   │       ├── classify.py
-│   │       ├── batch.py
-│   │       └── evaluate.py
+│   │       ├── classify.py           # POST /classify
+│   │       ├── batch.py              # POST /batch, GET /batch/{id}
+│   │       └── evaluate.py           # GET /evaluate
 │   ├── migrations/
-│   │   ├── init.sql              # Users table
-│   │   └── v2_documents.sql      # Documents + BatchJobs
-│   └── tests/                    # 16 pytest tests (mocked LLM)
+│   │   ├── init.sql                  # Users table
+│   │   └── v2_documents.sql          # Documents + BatchJobs tables
+│   └── tests/                        # 19 pytest tests (LLM mocked)
 │
 └── docs/technical/
     ├── api-spec.md
     ├── db-schema.md
-    └── classifier-design.md      # Prompt strategy + metadata schemas
+    └── classifier-design.md          # Prompt strategy + metadata schemas
 ```
 
 ---
 
 ## Evaluation
 
-Endpoint `GET /api/v1/evaluate` tính toán từ documents đã được gán nhãn (`ground_truth`):
+`GET /api/v1/evaluate` computes metrics against documents with a `ground_truth` label:
 
-- **Overall accuracy** — tổng số dự đoán đúng / tổng
-- **Per-class F1** — precision × recall / (precision + recall) cho mỗi loại
-- **Macro F1** — trung bình F1 tất cả classes
+- **Overall accuracy** — correct predictions / total
+- **Per-class F1** — harmonic mean of precision and recall per document type
+- **Macro F1** — unweighted average F1 across all classes
 
-**Target**: accuracy ≥ 90%, per-class F1 ≥ 0.85 cho 6 loại phổ biến nhất.
+**Targets**: accuracy ≥ 90%, per-class F1 ≥ 0.85 for the 6 most common document types.
 
 ---
 
 ## Design Decisions
 
-**Tại sao không dùng fine-tuned model?**
-Zero-shot với Llama 3.3 70B đạt accuracy đủ cao mà không cần labeled training data, không tốn cost fine-tuning, và dễ thêm loại mới bằng cách sửa prompt.
+**Why zero-shot instead of a fine-tuned model?**
+Llama 3.3 70B achieves sufficient accuracy out of the box with no labeled training data, no fine-tuning cost, and adding a new document type is as simple as updating the prompt — no retraining cycle.
 
-**Tại sao BackgroundTasks thay vì Celery/Redis queue?**
-Batch size ≤ 50 files, không cần distributed workers. BackgroundTasks đơn giản hơn, zero infra. Dễ nâng lên Celery khi scale.
+**Why FastAPI BackgroundTasks instead of Celery + Redis queue?**
+Batch size is capped at 50 files; distributed workers would be overkill. BackgroundTasks requires zero additional infrastructure. The codebase can be upgraded to Celery later with a single service swap.
 
-**Tại sao Groq thay vì OpenAI?**
-Inference nhanh hơn ~10x trên cùng model size, free tier 14.4K tokens/phút đủ cho MVP, không cần credit card.
+**Why Groq instead of OpenAI?**
+~10× faster inference on equivalent model sizes, 14,400 tokens/min free tier sufficient for MVP, and no credit card required to get started.
 
 ---
 
@@ -235,20 +236,20 @@ Inference nhanh hơn ~10x trên cùng model size, free tier 14.4K tokens/phút �
 
 ### Backend → Render (Docker)
 ```bash
-# render.yaml đã có sẵn
-# Cần set env vars trên Render dashboard:
+# render.yaml is pre-configured
+# Set these env vars in the Render dashboard:
 # DATABASE_URL, REDIS_URL, GROQ_API_KEY
 ```
 
 ### Frontend → Vercel
 ```bash
-# Auto-deploy từ master
-# Set: NEXT_PUBLIC_API_URL=https://your-render-service.onrender.com
+# Auto-deploys from master branch
+# Set: NEXT_PUBLIC_API_URL=https://your-service.onrender.com
 ```
 
 ### Database + Redis → AWS Lightsail ($3.50/month)
 ```bash
-ssh user@lightsail-ip
+ssh user@<lightsail-ip>
 docker compose -f docker-compose.prod.yml up -d
 psql $DATABASE_URL -f migrations/init.sql
 psql $DATABASE_URL -f migrations/v2_documents.sql
