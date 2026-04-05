@@ -1,0 +1,17 @@
+# Render Blueprint — Backend Web Service
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: my-app-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: REDIS_URL
+        sync: false
+    healthCheckPath: /health
+    autoDeploy: true

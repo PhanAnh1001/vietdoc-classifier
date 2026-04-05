@@ -1,0 +1,82 @@
+name: Deploy
+
+# Auto-deploy when CI passes on master, or trigger manually.
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [master]
+
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: "Deploy target"
+        required: true
+        default: both
+        type: choice
+        options:
+          - backend
+          - frontend
+          - both
+      dry_run:
+        description: "Dry-run (validate only)"
+        required: false
+        default: "true"
+        type: boolean
+
+# ── Required GitHub Secrets ──────────────────────────────────────────────
+#   RENDER_API_KEY        — Render API key for deploy hook
+#   RENDER_SERVICE_ID     — Render service ID for backend
+#   VERCEL_TOKEN          — Vercel deploy token (optional, Vercel auto-deploys)
+#
+# ── Required GitHub Variables ────────────────────────────────────────────
+#   NEXT_PUBLIC_API_URL   — Production backend URL (e.g. https://api.yourdomain.com)
+
+jobs:
+  # ── Deploy FastAPI backend to Render ─────────────────────────────────────
+  deploy-backend:
+    name: Deploy Backend (Render)
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.deploy_target != 'frontend') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+
+    steps:
+      - name: Trigger Render Deploy
+        if: inputs.dry_run != true
+        run: |
+          curl -X POST "https://api.render.com/deploy/srv-${{ secrets.RENDER_SERVICE_ID }}?key=${{ secrets.RENDER_API_KEY }}"
+          echo "Render deploy triggered"
+
+      - name: Dry-run — Skip deploy
+        if: inputs.dry_run == true
+        run: echo "Dry-run mode — skipping Render deploy"
+
+  # ── Frontend auto-deploys via Vercel Git integration ─────────────────────
+  deploy-frontend:
+    name: Deploy Frontend (Vercel)
+    runs-on: ubuntu-latest
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.deploy_target != 'backend') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+
+    steps:
+      - name: Frontend deploy info
+        run: |
+          echo "Frontend auto-deploys via Vercel Git integration."
+          echo "No manual action needed — Vercel watches the master branch."
+          echo "Vercel dashboard: https://vercel.com/dashboard"
+
+  # ── Summary ──────────────────────────────────────────────────────────────
+  deploy-summary:
+    name: Deploy Summary
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-frontend]
+    if: always()
+
+    steps:
+      - name: Report status
+        run: |
+          echo "Backend  : ${{ needs.deploy-backend.result }}"
+          echo "Frontend : ${{ needs.deploy-frontend.result }}"
+          echo "Trigger  : ${{ github.event_name }}"
