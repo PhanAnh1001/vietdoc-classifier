@@ -4,17 +4,23 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
+  FileSearch,
+  Layers,
   Settings,
   User,
   LogOut,
+  BarChart2,
 } from "lucide-react";
 import { useAuthStore } from "@/lib/auth-store";
 import { Toaster } from "@/components/ui/toaster";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/settings", label: "Settings", icon: Settings },
-  { href: "/profile", label: "Profile", icon: User },
+  { href: "/classify", label: "Phân loại", icon: FileSearch },
+  { href: "/batch", label: "Hàng loạt", icon: Layers },
+  { href: "/evaluate", label: "Đánh giá", icon: BarChart2 },
+  { href: "/settings", label: "Cài đặt", icon: Settings },
+  { href: "/profile", label: "Tài khoản", icon: User },
 ];
 
 export default function DashboardLayout({
@@ -34,7 +40,8 @@ export default function DashboardLayout({
     <div className="flex min-h-screen">
       <aside className="w-64 border-r bg-muted/40 p-4">
         <div className="mb-8">
-          <h2 className="text-lg font-bold">{"{Project Name}"}</h2>
+          <h2 className="text-lg font-bold">VietDoc Classifier</h2>
+          <p className="text-xs text-muted-foreground">Phân loại chứng từ AI</p>
         </div>
         <nav className="space-y-1">
           {navItems.map((item) => (
@@ -54,7 +61,7 @@ export default function DashboardLayout({
             className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent"
           >
             <LogOut className="h-4 w-4" />
-            Sign Out
+            Đăng xuất
           </button>
         </div>
       </aside>
